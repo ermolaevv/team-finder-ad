@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: team_finder_test
+          POSTGRES_USER: team_finder
+          POSTGRES_PASSWORD: team_finder
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    env:
+      DJANGO_SECRET_KEY: ci-secret-key-not-for-production
+      DJANGO_DEBUG: "True"
+      POSTGRES_DB: team_finder_test
+      POSTGRES_USER: team_finder
+      POSTGRES_PASSWORD: team_finder
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: "5432"
+      TASK_VERSION: "2"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt flake8
+
+      - name: Lint with flake8
+        run: |
+          flake8 . \
+            --max-line-length=100 \
+            --exclude=.venv,migrations,__pycache__,staticfiles
+
+      - name: Run tests
+        run: python manage.py test --verbosity=2

@@ -1,0 +1,137 @@
+import re
+
+from django import forms
+
+from .models import User
+
+
+class RegisterForm(forms.Form):
+    name = forms.CharField(
+        max_length=124,
+        label="Имя",
+        widget=forms.TextInput(attrs={"placeholder": "Имя"}),
+    )
+    surname = forms.CharField(
+        max_length=124,
+        label="Фамилия",
+        widget=forms.TextInput(attrs={"placeholder": "Фамилия"}),
+    )
+    email = forms.EmailField(
+        label="Email",
+        widget=forms.EmailInput(attrs={"placeholder": "Email"}),
+    )
+    password = forms.CharField(
+        label="Пароль",
+        widget=forms.PasswordInput(attrs={"placeholder": "Пароль"}),
+    )
+
+    def clean_email(self):
+        email = self.cleaned_data["email"].lower()
+        if User.objects.filter(email=email).exists():
+            raise forms.ValidationError("Пользователь с таким email уже существует.")
+        return email
+
+
+class LoginForm(forms.Form):
+    email = forms.EmailField(
+        label="Email",
+        widget=forms.EmailInput(attrs={"placeholder": "Email"}),
+    )
+    password = forms.CharField(
+        label="Пароль",
+        widget=forms.PasswordInput(attrs={"placeholder": "Пароль"}),
+    )
+
+
+def _normalize_phone(phone: str) -> str:
+    phone = phone.strip()
+    if phone.startswith("8") and len(phone) == 11:
+        return "+7" + phone[1:]
+    return phone
+
+
+def _validate_phone(phone: str) -> str:
+    if not phone:
+        return phone
+    phone = _normalize_phone(phone)
+    pattern = r"^\+7\d{10}$"
+    if not re.match(pattern, phone):
+        raise forms.ValidationError(
+            "Номер должен быть в формате +7XXXXXXXXXX или 8XXXXXXXXXX."
+        )
+    return phone
+
+
+class EditProfileForm(forms.ModelForm):
+    class Meta:
+        model = User
+        fields = ["name", "surname", "avatar", "about", "phone", "github_url"]
+        labels = {
+            "name": "Имя",
+            "surname": "Фамилия",
+            "avatar": "Аватар",
+            "about": "О себе",
+            "phone": "Телефон",
+            "github_url": "GitHub",
+        }
+        widgets = {
+            "avatar": forms.FileInput(),
+            "about": forms.Textarea(attrs={"rows": 4}),
+            "phone": forms.TextInput(attrs={"placeholder": "+7XXXXXXXXXX или 8XXXXXXXXXX"}),
+            "github_url": forms.URLInput(attrs={"placeholder": "https://github.com/username"}),
+        }
+
+    def clean_phone(self):
+        phone = self.cleaned_data.get("phone", "").strip()
+        if not phone:
+            return phone
+        phone = _validate_phone(phone)
+        qs = User.objects.filter(phone=phone)
+        if self.instance and self.instance.pk:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise forms.ValidationError(
+                "Этот номер телефона уже используется другим пользователем."
+            )
+        return phone
+
+    def clean_github_url(self):
+        url = self.cleaned_data.get("github_url", "").strip()
+        if not url:
+            return url
+        if "github.com" not in url:
+            raise forms.ValidationError("Ссылка должна вести на GitHub (github.com).")
+        return url
+
+
+class ChangePasswordForm(forms.Form):
+    old_password = forms.CharField(
+        label="Текущий пароль",
+        widget=forms.PasswordInput(),
+    )
+    new_password1 = forms.CharField(
+        label="Новый пароль",
+        widget=forms.PasswordInput(),
+    )
+    new_password2 = forms.CharField(
+        label="Подтвердите новый пароль",
+        widget=forms.PasswordInput(),
+    )
+
+    def __init__(self, user, *args, **kwargs):
+        self.user = user
+        super().__init__(*args, **kwargs)
+
+    def clean_old_password(self):
+        old_password = self.cleaned_data["old_password"]
+        if not self.user.check_password(old_password):
+            raise forms.ValidationError("Неверный текущий пароль.")
+        return old_password
+
+    def clean(self):
+        cleaned = super().clean()
+        p1 = cleaned.get("new_password1")
+        p2 = cleaned.get("new_password2")
+        if p1 and p2 and p1 != p2:
+            self.add_error("new_password2", "Пароли не совпадают.")
+        return cleaned

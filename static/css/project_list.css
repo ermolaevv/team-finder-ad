@@ -133,6 +133,48 @@
     background-color: #fafafa;
 }
 
+.pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    margin-top: 40px;
+}
+
+.pagination a,
+.pagination span {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 36px;
+    height: 36px;
+    padding: 0 10px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 14px;
+    text-decoration: none;
+    color: #333;
+    background: #fff;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.pagination a:hover {
+    background: #f0f0f0;
+    border-color: #aaa;
+}
+
+.pagination .current {
+    background: #111;
+    color: #fff;
+    border-color: #111;
+    font-weight: 600;
+}
+
+.pagination .disabled {
+    color: #bbb;
+    pointer-events: none;
+}
+
 .empty-project-card h3 {
     margin-bottom: 0;
 }

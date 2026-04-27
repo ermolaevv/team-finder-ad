@@ -1,10 +1,21 @@
-// Profile skills UI logic
+﻿// Skills UI logic for both user profile and project pages
 (function(){
   document.addEventListener("DOMContentLoaded", () => {
     const container = document.getElementById("skills-container");
     if (!container) return;
 
     const projectId = container.dataset.projectId;
+    const userId = container.dataset.userId;
+
+    if (!projectId && !userId) return;
+
+    const isUserMode = !!userId;
+    const entityId = isUserMode ? userId : projectId;
+
+    const autocompleteUrl = isUserMode ? `/users/skills/?q=` : `/projects/skills/?q=`;
+    const addUrl = isUserMode ? `/users/${entityId}/skills/add/` : `/projects/${entityId}/skills/add/`;
+    const removeUrlBase = isUserMode ? `/users/${entityId}/skills/` : `/projects/${entityId}/skills/`;
+
     const addBtn = document.getElementById("add-skill-btn");
     const inputWrapper = document.getElementById("skill-input-wrapper");
     const input = document.getElementById("skill-input");
@@ -31,7 +42,7 @@
         return;
       }
       t = setTimeout(async () => {
-        const res = await fetch(`/projects/skills/?q=${encodeURIComponent(q)}`);
+        const res = await fetch(`${autocompleteUrl}${encodeURIComponent(q)}`);
         if (!res.ok) return;
         const data = await res.json();
 
@@ -47,7 +58,7 @@
         const exact = data.some(s => s.name.toLowerCase() === q.toLowerCase());
         if (!exact) {
           const liNew = document.createElement("li");
-          liNew.textContent = `Создать «${q}»`;
+          liNew.textContent = `Создать ${String.fromCharCode(171)}${q}${String.fromCharCode(187)}`;
           liNew.dataset.name = q;
           liNew.className = "create-new";
           suggestions.appendChild(liNew);
@@ -60,7 +71,6 @@
     suggestions.addEventListener("mousedown", async (e) => {
       const li = e.target.closest("li");
       if (!li) return;
-
       if (li.classList.contains("create-new")) {
         await addSkillByName(li.dataset.name);
       } else if (li.dataset.id) {
@@ -74,7 +84,6 @@
         e.preventDefault();
         const q = input.value.trim();
         if (!q) return;
-
         const first = suggestions.querySelector("li");
         if (first && first.dataset.id) {
           await addSkillById(first.dataset.id);
@@ -83,9 +92,7 @@
         }
         hideInput();
       }
-      if (e.key === "Escape") {
-        hideInput();
-      }
+      if (e.key === "Escape") { hideInput(); }
     });
 
     input.addEventListener("blur", () => setTimeout(hideInput, 120));
@@ -100,56 +107,45 @@
       if (e.target.classList.contains("remove-skill-btn")) {
         const chip = e.target.closest(".skill-chip");
         const skillId = chip.dataset.id;
-        const res = await fetch(`/projects/${projectId}/skills/${skillId}/remove/`, {
+        const res = await fetch(`${removeUrlBase}${skillId}/remove/`, {
           method: "POST",
           headers: { "X-CSRFToken": getCookie("csrftoken") }
         });
-        if (res.ok) {
-          chip.remove();
-        }
+        if (res.ok) { chip.remove(); }
       }
     });
 
     async function addSkillById(skillId) {
-      const res = await fetch(`/projects/${projectId}/skills/add/`, {
+      const res = await fetch(addUrl, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-CSRFToken": getCookie("csrftoken"),
-        },
+        headers: { "Content-Type": "application/json", "X-CSRFToken": getCookie("csrftoken") },
         body: JSON.stringify({ skill_id: skillId }),
       });
       if (res.ok) {
         const skill = await res.json();
-        appendChip(skill.id, skill.name);
+        appendChip(skill.skill_id !== undefined ? skill.skill_id : skill.id, skill.name);
       }
     }
 
     async function addSkillByName(name) {
-      const res = await fetch(`/projects/${projectId}/skills/add/`, {
+      const res = await fetch(addUrl, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-CSRFToken": getCookie("csrftoken"),
-        },
+        headers: { "Content-Type": "application/json", "X-CSRFToken": getCookie("csrftoken") },
         body: JSON.stringify({ name }),
       });
       if (res.ok) {
         const skill = await res.json();
-        appendChip(skill.id, skill.name);
+        appendChip(skill.skill_id !== undefined ? skill.skill_id : skill.id, skill.name);
       }
     }
 
     function appendChip(id, name) {
       if (container.querySelector(`.skill-chip[data-id="${id}"]`)) return;
-
       const chip = document.createElement("span");
       chip.className = "skill-chip";
       chip.dataset.id = id;
-      chip.innerHTML = `${name} <button type="button" class="remove-skill-btn" aria-label="Удалить" title="Удалить">×</button>`;
-
+      chip.innerHTML = `${name} <button type="button" class="remove-skill-btn" aria-label="Удалить" title="Удалить">&times;</button>`;
       container.insertBefore(chip, addBtn);
-
       const empty = container.querySelector(".skill-empty");
       if (empty) empty.remove();
     }

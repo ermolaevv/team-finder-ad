@@ -6,6 +6,7 @@
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'css/project_list.css' %}">
 <link rel="stylesheet" href="{% static 'css/participants.css' %}">
+<link rel="stylesheet" href="{% static 'css/skills.css' %}">
 {% endblock %}
 
 {% block content %}
@@ -17,31 +18,21 @@
         </div>
     </div>
 
-    {% if request.user.is_authenticated %}
-        <div class="participants-filter">
-            <span class="filter-label">Фильтры пользователей:</span>
-            <div class="filter-chips">
-                <a href="?filter=owners-of-favorite-projects"
-                   class="filter-chip {% if active_filter == 'owners-of-favorite-projects' %}active{% endif %}">
-                    Авторы избранных проектов
-                </a>
-                <a href="?filter=owners-of-participating-projects"
-                   class="filter-chip {% if active_filter == 'owners-of-participating-projects' %}active{% endif %}">
-                    Авторы проектов, в которых я участвую
-                </a>
-                <a href="?filter=interested-in-my-projects"
-                   class="filter-chip {% if active_filter == 'interested-in-my-projects' %}active{% endif %}">
-                    Пользователи, которым нравятся мои проекты
-                </a>
-                <a href="?filter=participants-of-my-projects"
-                   class="filter-chip {% if active_filter == 'participants-of-my-projects' %}active{% endif %}">
-                    Участники моих проектов
-                </a>
-                {% if active_filter %}
-                <a href="/users/list" class="filter-reset">Сбросить</a>
-                {% endif %}
-            </div>
+    {% if all_skills %}
+    <div class="participants-filter">
+        <span class="filter-label">Фильтр по навыкам:</span>
+        <div class="filter-chips">
+            {% for skill in all_skills %}
+            <a href="?skill={{ skill.name|urlencode }}"
+               class="filter-chip {% if active_skill == skill.name %}active{% endif %}">
+                {{ skill.name }}
+            </a>
+            {% endfor %}
+            {% if active_skill %}
+            <a href="/users/list" class="filter-reset">Сбросить</a>
+            {% endif %}
         </div>
+    </div>
     {% endif %}
 
     {% if participants %}
@@ -69,6 +60,30 @@
     </div>
     {% else %}
     {% include 'includes/empty-project-card.html' with empty_title="Пока нет участников" empty_message="Попробуйте сбросить фильтр" button_link="/users/list" button_text="Сбросить" %}
+    {% endif %}
+
+    {% if participants.has_other_pages %}
+    <div class="pagination">
+        {% if participants.has_previous %}
+            <a href="?{% if active_skill %}skill={{ active_skill|urlencode }}&{% endif %}page={{ participants.previous_page_number }}">&laquo;</a>
+        {% else %}
+            <span class="disabled">&laquo;</span>
+        {% endif %}
+
+        {% for num in participants.paginator.page_range %}
+            {% if participants.number == num %}
+                <span class="current">{{ num }}</span>
+            {% elif num >= participants.number|add:"-2" and num <= participants.number|add:"2" %}
+                <a href="?{% if active_skill %}skill={{ active_skill|urlencode }}&{% endif %}page={{ num }}">{{ num }}</a>
+            {% endif %}
+        {% endfor %}
+
+        {% if participants.has_next %}
+            <a href="?{% if active_skill %}skill={{ active_skill|urlencode }}&{% endif %}page={{ participants.next_page_number }}">&raquo;</a>
+        {% else %}
+            <span class="disabled">&raquo;</span>
+        {% endif %}
+    </div>
     {% endif %}
 </div>
 {% endblock %}
