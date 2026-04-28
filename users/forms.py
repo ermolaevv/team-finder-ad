@@ -1,18 +1,19 @@
-import re
-
 from django import forms
 
+from team_finder.utils import validate_phone
 from .models import User
+
+MAX_NAME_LENGTH = 124
 
 
 class RegisterForm(forms.Form):
     name = forms.CharField(
-        max_length=124,
+        max_length=MAX_NAME_LENGTH,
         label="Имя",
         widget=forms.TextInput(attrs={"placeholder": "Имя"}),
     )
     surname = forms.CharField(
-        max_length=124,
+        max_length=MAX_NAME_LENGTH,
         label="Фамилия",
         widget=forms.TextInput(attrs={"placeholder": "Фамилия"}),
     )
@@ -31,6 +32,14 @@ class RegisterForm(forms.Form):
             raise forms.ValidationError("Пользователь с таким email уже существует.")
         return email
 
+    def save(self):
+        return User.objects.create_user(
+            email=self.cleaned_data["email"],
+            name=self.cleaned_data["name"],
+            surname=self.cleaned_data["surname"],
+            password=self.cleaned_data["password"],
+        )
+
 
 class LoginForm(forms.Form):
     email = forms.EmailField(
@@ -41,25 +50,6 @@ class LoginForm(forms.Form):
         label="Пароль",
         widget=forms.PasswordInput(attrs={"placeholder": "Пароль"}),
     )
-
-
-def _normalize_phone(phone: str) -> str:
-    phone = phone.strip()
-    if phone.startswith("8") and len(phone) == 11:
-        return "+7" + phone[1:]
-    return phone
-
-
-def _validate_phone(phone: str) -> str:
-    if not phone:
-        return phone
-    phone = _normalize_phone(phone)
-    pattern = r"^\+7\d{10}$"
-    if not re.match(pattern, phone):
-        raise forms.ValidationError(
-            "Номер должен быть в формате +7XXXXXXXXXX или 8XXXXXXXXXX."
-        )
-    return phone
 
 
 class EditProfileForm(forms.ModelForm):
@@ -85,7 +75,7 @@ class EditProfileForm(forms.ModelForm):
         phone = self.cleaned_data.get("phone", "").strip()
         if not phone:
             return phone
-        phone = _validate_phone(phone)
+        phone = validate_phone(phone)
         qs = User.objects.filter(phone=phone)
         if self.instance and self.instance.pk:
             qs = qs.exclude(pk=self.instance.pk)

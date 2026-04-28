@@ -1,26 +1,24 @@
 import json
+from http import HTTPStatus
 
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
-from django.core.paginator import Paginator
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_GET, require_POST
 
+from team_finder.utils import paginate
 from .forms import ChangePasswordForm, EditProfileForm, LoginForm, RegisterForm
 from .models import Skill, User
+
+SKILL_AUTOCOMPLETE_LIMIT = 10
 
 
 def register(request):
     if request.method == "POST":
         form = RegisterForm(request.POST)
         if form.is_valid():
-            User.objects.create_user(
-                email=form.cleaned_data["email"],
-                name=form.cleaned_data["name"],
-                surname=form.cleaned_data["surname"],
-                password=form.cleaned_data["password"],
-            )
+            form.save()
             return redirect("users:login")
     else:
         form = RegisterForm()
@@ -90,15 +88,11 @@ def participants(request):
 
     all_skills = Skill.objects.all().order_by("name")
 
-    paginator = Paginator(queryset, 12)
-    page_number = request.GET.get("page")
-    page_obj = paginator.get_page(page_number)
-
     return render(
         request,
         "users/participants.html",
         {
-            "participants": page_obj,
+            "participants": paginate(request, queryset),
             "all_skills": all_skills,
             "active_skill": active_skill,
         },
@@ -108,7 +102,7 @@ def participants(request):
 @require_GET
 def skill_autocomplete(request):
     q = request.GET.get("q", "").strip()
-    skills = Skill.objects.filter(name__istartswith=q).order_by("name")[:10]
+    skills = Skill.objects.filter(name__istartswith=q).order_by("name")[:SKILL_AUTOCOMPLETE_LIMIT]
     data = list(skills.values("id", "name"))
     return JsonResponse(data, safe=False)
 
@@ -117,7 +111,7 @@ def skill_autocomplete(request):
 @require_POST
 def add_user_skill(request, user_id):
     if request.user.pk != user_id:
-        return JsonResponse({"error": "Forbidden"}, status=403)
+        return JsonResponse({"error": "Forbidden"}, status=HTTPStatus.FORBIDDEN)
     try:
         body = json.loads(request.body)
     except (json.JSONDecodeError, ValueError):
@@ -132,7 +126,9 @@ def add_user_skill(request, user_id):
     elif name:
         skill, created = Skill.objects.get_or_create(name=name)
     else:
-        return JsonResponse({"error": "No skill_id or name provided"}, status=400)
+        return JsonResponse(
+            {"error": "No skill_id or name provided"}, status=HTTPStatus.BAD_REQUEST
+        )
 
     added = False
     if skill not in request.user.skills.all():
@@ -148,9 +144,9 @@ def add_user_skill(request, user_id):
 @require_POST
 def remove_user_skill(request, user_id, skill_id):
     if request.user.pk != user_id:
-        return JsonResponse({"error": "Forbidden"}, status=403)
+        return JsonResponse({"error": "Forbidden"}, status=HTTPStatus.FORBIDDEN)
     skill = get_object_or_404(Skill, pk=skill_id)
     if not request.user.skills.filter(pk=skill_id).exists():
-        return JsonResponse({"error": "Skill not in user profile"}, status=400)
+        return JsonResponse({"error": "Skill not in user profile"}, status=HTTPStatus.BAD_REQUEST)
     request.user.skills.remove(skill)
     return JsonResponse({"status": "ok"})

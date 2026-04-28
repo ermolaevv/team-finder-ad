@@ -1,40 +1,43 @@
-import io
-import random
-
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
-from django.core.files.base import ContentFile
 from django.db import models
-from PIL import Image, ImageDraw, ImageFont
 
+from team_finder.utils import generate_avatar
 from .managers import UserManager
 
 
+AVATAR_COLOR_STEEL_BLUE = "#4A90D9"
+AVATAR_COLOR_MEDIUM_SLATE_BLUE = "#7B68EE"
+AVATAR_COLOR_CADET_BLUE = "#5F9EA0"
+AVATAR_COLOR_MEDIUM_SEA_GREEN = "#3CB371"
+AVATAR_COLOR_PERU = "#CD853F"
+AVATAR_COLOR_CHOCOLATE = "#D2691E"
+AVATAR_COLOR_LIGHT_SEA_GREEN = "#20B2AA"
+AVATAR_COLOR_CORNFLOWER_BLUE = "#6495ED"
+AVATAR_COLOR_PALE_VIOLET_RED = "#DB7093"
+AVATAR_COLOR_MEDIUM_PURPLE = "#9370DB"
+AVATAR_COLOR_SEA_GREEN = "#2E8B57"
+AVATAR_COLOR_DARK_ORANGE = "#FF8C00"
+AVATAR_COLOR_SADDLE_BROWN = "#8B4513"
+AVATAR_COLOR_ROYAL_BLUE = "#4682B4"
+AVATAR_COLOR_SLATE_GRAY = "#708090"
+
 AVATAR_COLORS = [
-    "#4A90D9", "#7B68EE", "#5F9EA0", "#3CB371", "#CD853F",
-    "#D2691E", "#20B2AA", "#6495ED", "#DB7093", "#9370DB",
-    "#2E8B57", "#FF8C00", "#8B4513", "#4682B4", "#708090",
+    AVATAR_COLOR_STEEL_BLUE,
+    AVATAR_COLOR_MEDIUM_SLATE_BLUE,
+    AVATAR_COLOR_CADET_BLUE,
+    AVATAR_COLOR_MEDIUM_SEA_GREEN,
+    AVATAR_COLOR_PERU,
+    AVATAR_COLOR_CHOCOLATE,
+    AVATAR_COLOR_LIGHT_SEA_GREEN,
+    AVATAR_COLOR_CORNFLOWER_BLUE,
+    AVATAR_COLOR_PALE_VIOLET_RED,
+    AVATAR_COLOR_MEDIUM_PURPLE,
+    AVATAR_COLOR_SEA_GREEN,
+    AVATAR_COLOR_DARK_ORANGE,
+    AVATAR_COLOR_SADDLE_BROWN,
+    AVATAR_COLOR_ROYAL_BLUE,
+    AVATAR_COLOR_SLATE_GRAY,
 ]
-
-
-def generate_avatar(letter: str) -> ContentFile:
-    size = 200
-    color = random.choice(AVATAR_COLORS)
-    img = Image.new("RGB", (size, size), color=color)
-    draw = ImageDraw.Draw(img)
-    try:
-        font = ImageFont.truetype("arial.ttf", size=100)
-    except OSError:
-        font = ImageFont.load_default(size=100)
-    text = letter.upper()
-    bbox = draw.textbbox((0, 0), text, font=font)
-    text_w = bbox[2] - bbox[0]
-    text_h = bbox[3] - bbox[1]
-    x = (size - text_w) / 2 - bbox[0]
-    y = (size - text_h) / 2 - bbox[1]
-    draw.text((x, y), text, fill="white", font=font)
-    buffer = io.BytesIO()
-    img.save(buffer, format="PNG")
-    return ContentFile(buffer.getvalue())
 
 
 class Skill(models.Model):
@@ -75,5 +78,5 @@ class User(AbstractBaseUser, PermissionsMixin):
         super().save(*args, **kwargs)
         if is_new and not self.avatar:
             letter = self.name[0] if self.name else "U"
-            avatar_content = generate_avatar(letter)
+            avatar_content = generate_avatar(letter, AVATAR_COLORS)
             self.avatar.save(f"avatar_{self.pk}.png", avatar_content, save=True)
